@@ -1,0 +1,73 @@
+# =============================================================================
+# AWS "cheapest" production overrides.
+#   helm upgrade --install kp ./helm/knowledge-platform \
+#     -n knowledge-platform --create-namespace \
+#     -f helm/knowledge-platform/values-aws.yaml \
+#     --set image.registry=<acct>.dkr.ecr.<region>.amazonaws.com \
+#     --set storage.s3.bucket=kp-documents-prod \
+#     --set ingress.host=kp.example.com
+# =============================================================================
+
+image:
+  registry: ""            # <account>.dkr.ecr.<region>.amazonaws.com
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+config:
+  embeddingProvider: openai
+  llmProvider: openai
+  storageProvider: s3
+  documentLinkBase: "https://kp.example.com/api/v1/documents/{documentId}"
+  # External RDS (set postgres.enabled=false below). Point at the RDS endpoint:
+  datasource:
+    url: "jdbc:postgresql://kp-db.xxxxxx.<region>.rds.amazonaws.com:5432/knowledge_platform"
+  # Self-hosted Kafka/Redpanda in-cluster, or MSK Serverless bootstrap:
+  kafkaBootstrapServers: "{{ .Release.Name }}-redpanda:9092"
+
+storage:
+  s3:
+    bucket: kp-documents-prod
+    region: eu-west-1
+    prefix: "documents/"
+
+# Pull DB creds + OpenAI key from AWS Secrets Manager via External Secrets Operator.
+secrets:
+  mode: external
+  external:
+    secretStoreRef: aws-secrets-manager
+    kind: ClusterSecretStore
+    refreshInterval: 1h
+    remoteRef:
+      SPRING_DATASOURCE_USERNAME: { key: knowledge-platform/db, property: username }
+      SPRING_DATASOURCE_PASSWORD: { key: knowledge-platform/db, property: password }
+      OPENAI_API_KEY:            { key: knowledge-platform/openai, property: api_key }
+
+# IRSA: bind the app ServiceAccount to an IAM role granting S3 (+ Secrets Manager
+# if ESO uses IRSA rather than the node role).
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/kp-app
+
+# Managed Postgres (RDS) -> disable the in-cluster StatefulSet.
+postgres:
+  enabled: false
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: alb            # AWS Load Balancer Controller; or "traefik" on k3s
+  host: kp.example.com
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    # Streaming: keep idle timeout high for SSE/NDJSON on /api/v1/rag
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=300
+  tls:
+    enabled: true
+    secretName: kp-tls

@@ -1,0 +1,114 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-rag-schema
+      author: copilot
+      changes:
+        - sql:
+            sql: CREATE SCHEMA IF NOT EXISTS rag_service
+
+  - changeSet:
+      id: 002-create-rag-conversations
+      author: copilot
+      changes:
+        - createTable:
+            schemaName: rag_service
+            tableName: rag_conversations
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_access_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+        - createIndex:
+            schemaName: rag_service
+            tableName: rag_conversations
+            indexName: idx_rag_conversations_user_last_access
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: last_access_at
+                  descending: true
+
+  - changeSet:
+      id: 003-create-rag-messages
+      author: copilot
+      changes:
+        - createTable:
+            schemaName: rag_service
+            tableName: rag_messages
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: conversation_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seq
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableSchemaName: rag_service
+            baseTableName: rag_messages
+            baseColumnNames: conversation_id
+            referencedTableSchemaName: rag_service
+            referencedTableName: rag_conversations
+            referencedColumnNames: id
+            onDelete: CASCADE
+            constraintName: fk_rag_messages_conversation
+        - addUniqueConstraint:
+            schemaName: rag_service
+            tableName: rag_messages
+            columnNames: conversation_id, seq
+            constraintName: uq_rag_messages_conversation_seq
+        - sql:
+            sql: ALTER TABLE rag_service.rag_messages ADD CONSTRAINT ck_rag_messages_role
+                 CHECK (role IN ('USER','ASSISTANT','SYSTEM'))
+        - createIndex:
+            schemaName: rag_service
+            tableName: rag_messages
+            indexName: idx_rag_messages_conversation_seq
+            columns:
+              - column:
+                  name: conversation_id
+              - column:
+                  name: seq
+

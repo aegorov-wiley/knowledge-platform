@@ -1,0 +1,158 @@
+# =============================================================================
+# Knowledge Platform — Helm values
+# Defaults are safe for a local/dev cluster (offline stub providers, in-cluster
+# Postgres, plain Secret). Flip the commented blocks for the AWS "cheapest"
+# production topology (S3 storage, external RDS/Kafka, AWS Secrets Manager).
+# =============================================================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ---- Container images -------------------------------------------------------
+image:
+  registry: ""            # e.g. 123456789012.dkr.ecr.eu-west-1.amazonaws.com
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+imagePullSecrets: []
+
+# ---- Global / shared application config ------------------------------------
+config:
+  # Provider selection. dev: stub (offline, no keys). prod: openai.
+  embeddingProvider: stub          # stub | openai | azure
+  llmProvider: stub                # stub | openai | azure
+  embeddingDimensions: "768"
+  openaiChatModel: gpt-4o-mini
+  openaiEmbeddingModel: text-embedding-3-small
+  documentLinkBase: "http://localhost:8080/api/v1/documents/{documentId}"
+
+  # Storage backend. dev: local (emptyDir). prod: s3 (see storage.s3 below).
+  storageProvider: local           # local | s3
+  storageRoot: /var/lib/knowledge-platform/storage
+
+  # Kafka
+  kafkaBootstrapServers: "{{ .Release.Name }}-kafka:9092"
+  documentsTopic: knowledge.documents.v1
+  indexingConsumerGroup: indexing-service-v1
+
+  # Datasource (schema per service; single database)
+  datasource:
+    url: "jdbc:postgresql://{{ .Release.Name }}-postgres:5432/knowledge_platform"
+    # username/password come from the Secret (see secrets.* below)
+
+# ---- AWS S3 storage (used when config.storageProvider=s3) -------------------
+storage:
+  s3:
+    bucket: ""                     # e.g. kp-documents-prod
+    region: "eu-west-1"
+    # endpoint: ""                 # set for LocalStack/MinIO testing
+    prefix: "documents/"
+
+# ---- Secrets ----------------------------------------------------------------
+# mode=plain  -> render a Kubernetes Secret from .Values.secrets.data (dev only)
+# mode=external -> render an ExternalSecret (AWS Secrets Manager via ESO)
+secrets:
+  mode: plain                      # plain | external
+  # dev inline values (DO NOT use in prod / do not commit real keys)
+  data:
+    SPRING_DATASOURCE_USERNAME: knowledge_platform
+    SPRING_DATASOURCE_PASSWORD: knowledge_platform
+    OPENAI_API_KEY: ""
+  external:
+    secretStoreRef: aws-secrets-manager   # name of a (Cluster)SecretStore
+    kind: ClusterSecretStore
+    refreshInterval: 1h
+    # Map k8s secret keys -> AWS Secrets Manager secret + JSON property
+    remoteRef:
+      SPRING_DATASOURCE_USERNAME: { key: knowledge-platform/db, property: username }
+      SPRING_DATASOURCE_PASSWORD: { key: knowledge-platform/db, property: password }
+      OPENAI_API_KEY:            { key: knowledge-platform/openai, property: api_key }
+
+# ---- Service accounts / IRSA ------------------------------------------------
+serviceAccount:
+  create: true
+  # For EKS+IRSA set the IAM role that grants S3 (and, if used, Secrets Manager)
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/kp-app
+  annotations: {}
+
+# ---- Per-service settings ---------------------------------------------------
+documentService:
+  enabled: true
+  replicas: 2
+  image: { repository: knowledge-platform-document-service }
+  port: 8080
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 768Mi }
+
+indexingService:
+  enabled: true
+  replicas: 1                      # scale up to <= #partitions of the topic
+  image: { repository: knowledge-platform-indexing-service }
+  port: 8080                       # actuator only (Kafka consumer, no HTTP API)
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 750m, memory: 1Gi }
+
+ragService:
+  enabled: true
+  replicas: 2
+  image: { repository: knowledge-platform-rag-service }
+  port: 8082
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 768Mi }
+
+ui:
+  enabled: true
+  replicas: 2
+  image: { repository: knowledge-platform-ui }
+  port: 80
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits:   { cpu: 100m, memory: 64Mi }
+
+# ---- In-cluster PostgreSQL (dev / cheapest self-hosted) ---------------------
+# For prod on RDS: set postgres.enabled=false and point config.datasource.url +
+# the DB secret at the managed endpoint.
+postgres:
+  enabled: true
+  image: pgvector/pgvector:pg16
+  storage: 5Gi
+  storageClassName: ""             # "" = cluster default (e.g. gp3 on EKS)
+  database: knowledge_platform
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+# ---- Kafka ------------------------------------------------------------------
+# This chart does NOT bundle Kafka. Use one of:
+#   * cheapest self-host: Redpanda / single-broker Kafka (KRaft) in-cluster
+#   * managed: MSK Serverless
+# Set config.kafkaBootstrapServers accordingly.
+
+# ---- Ingress (UI is the single public entrypoint; same-origin proxy) --------
+ingress:
+  enabled: true
+  className: ""                    # traefik (k3s) | alb (EKS) | nginx
+  host: kp.example.com
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: kp-tls
+
+# ---- Horizontal Pod Autoscaling (rag + document) ---------------------------
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

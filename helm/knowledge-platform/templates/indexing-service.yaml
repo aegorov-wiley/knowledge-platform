@@ -1,0 +1,78 @@
+{{- if .Values.indexingService.enabled }}
+{{- $component := "indexing-service" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ $component }}
+  labels:
+    {{- include "kp.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $component }}
+    app.kubernetes.io/component: worker
+spec:
+  # Kafka consumer: scale replicas up to the partition count of the topic.
+  replicas: {{ .Values.indexingService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "kp.selectorLabels" (dict "ctx" . "component" $component) | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "kp.labels" . | nindent 8 }}
+        {{- include "kp.selectorLabels" (dict "ctx" . "component" $component) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kp.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $component }}
+          image: "{{ if .Values.image.registry }}{{ .Values.image.registry }}/{{ end }}{{ .Values.indexingService.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.indexingService.port }}
+          envFrom:
+            - configMapRef: { name: {{ include "kp.fullname" . }}-config }
+            - secretRef: { name: {{ include "kp.fullname" . }}-secrets }
+          {{- if eq .Values.config.storageProvider "local" }}
+          volumeMounts:
+            - name: uploads
+              mountPath: {{ .Values.config.storageRoot }}
+          {{- end }}
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.indexingService.resources | nindent 12 }}
+      {{- if eq .Values.config.storageProvider "local" }}
+      volumes:
+        - name: uploads
+          emptyDir: {}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ $component }}
+  labels:
+    {{- include "kp.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ $component }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "kp.selectorLabels" (dict "ctx" . "component" $component) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.indexingService.port }}
+      targetPort: http
+{{- end }}

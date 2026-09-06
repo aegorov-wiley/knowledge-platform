@@ -1,0 +1,142 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-indexing-schema
+      author: copilot
+      changes:
+        - sql:
+            sql: CREATE SCHEMA IF NOT EXISTS indexing_service
+
+  - changeSet:
+      id: 002-create-indexed-documents
+      author: copilot
+      changes:
+        - createTable:
+            schemaName: indexing_service
+            tableName: indexed_documents
+            columns:
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: file_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_type
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: storage_key
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: chunk_count
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: indexed_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_event_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            schemaName: indexing_service
+            tableName: indexed_documents
+            columnNames: last_event_id
+            constraintName: uq_indexed_documents_last_event_id
+        - createIndex:
+            schemaName: indexing_service
+            tableName: indexed_documents
+            indexName: idx_indexed_documents_status_updated_at
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: updated_at
+
+  - changeSet:
+      id: 003-create-document-chunks
+      author: copilot
+      changes:
+        - createTable:
+            schemaName: indexing_service
+            tableName: document_chunks
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+              - column:
+                  name: document_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: chunk_index
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableSchemaName: indexing_service
+            baseTableName: document_chunks
+            baseColumnNames: document_id
+            referencedTableSchemaName: indexing_service
+            referencedTableName: indexed_documents
+            referencedColumnNames: document_id
+            onDelete: CASCADE
+            constraintName: fk_document_chunks_document_id
+        - createIndex:
+            schemaName: indexing_service
+            tableName: document_chunks
+            indexName: idx_document_chunks_document_id_chunk_index
+            columns:
+              - column:
+                  name: document_id
+              - column:
+                  name: chunk_index
+
+  - changeSet:
+      id: 004-enable-pgvector-extension
+      author: copilot
+      changes:
+        - sql:
+            sql: CREATE EXTENSION IF NOT EXISTS vector
+
+  - changeSet:
+      id: 005-add-document-chunks-embedding
+      author: copilot
+      changes:
+        - sql:
+            sql: ALTER TABLE indexing_service.document_chunks ADD COLUMN embedding vector(768)
+

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: knowledge-platform
+description: >-
+  Helm chart for the Knowledge Platform RAG system (document-service,
+  indexing-service, rag-service and the nginx demo UI). Backing services
+  (PostgreSQL/pgvector, Kafka) and storage (AWS S3) and secrets
+  (AWS Secrets Manager via External Secrets Operator) are pluggable.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - rag
+  - spring-boot
+  - kafka
+  - pgvector
+maintainers:
+  - name: Knowledge Platform

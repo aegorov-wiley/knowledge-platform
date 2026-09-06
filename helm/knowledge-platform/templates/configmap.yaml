@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kp.fullname" . }}-config
+  labels:
+    {{- include "kp.labels" . | nindent 4 }}
+data:
+  # --- shared ---
+  SPRING_DATASOURCE_URL: {{ tpl .Values.config.datasource.url . | quote }}
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: {{ tpl .Values.config.kafkaBootstrapServers . | quote }}
+  KNOWLEDGE_PLATFORM_STORAGE_ROOT: {{ .Values.config.storageRoot | quote }}
+  KNOWLEDGE_PLATFORM_STORAGE_PROVIDER: {{ .Values.config.storageProvider | quote }}
+
+  # --- providers (kept identical for indexing + rag to preserve embedding parity) ---
+  EMBEDDING_PROVIDER: {{ .Values.config.embeddingProvider | quote }}
+  LLM_PROVIDER: {{ .Values.config.llmProvider | quote }}
+  EMBEDDING_DIMENSIONS: {{ .Values.config.embeddingDimensions | quote }}
+  OPENAI_CHAT_MODEL: {{ .Values.config.openaiChatModel | quote }}
+  OPENAI_EMBEDDING_MODEL: {{ .Values.config.openaiEmbeddingModel | quote }}
+  OPENAI_EMBEDDING_DIMENSIONS: {{ .Values.config.embeddingDimensions | quote }}
+  DOCUMENT_LINK_BASE: {{ .Values.config.documentLinkBase | quote }}
+
+  {{- if eq .Values.config.storageProvider "s3" }}
+  # --- AWS S3 (consumed by S3FileStorage / S3StorageReader) ---
+  KNOWLEDGE_PLATFORM_STORAGE_S3_BUCKET: {{ .Values.storage.s3.bucket | quote }}
+  KNOWLEDGE_PLATFORM_STORAGE_S3_REGION: {{ .Values.storage.s3.region | quote }}
+  KNOWLEDGE_PLATFORM_STORAGE_S3_PREFIX: {{ .Values.storage.s3.prefix | quote }}
+  {{- with .Values.storage.s3.endpoint }}
+  KNOWLEDGE_PLATFORM_STORAGE_S3_ENDPOINT: {{ . | quote }}
+  {{- end }}
+  {{- end }}

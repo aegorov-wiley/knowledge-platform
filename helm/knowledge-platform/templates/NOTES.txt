@@ -1,0 +1,36 @@
+Knowledge Platform ({{ .Chart.Version }}) installed as release "{{ .Release.Name }}".
+
+Providers:  embedding={{ .Values.config.embeddingProvider }}  llm={{ .Values.config.llmProvider }}
+Storage:    {{ .Values.config.storageProvider }}{{ if eq .Values.config.storageProvider "s3" }} (bucket: {{ .Values.storage.s3.bucket }}){{ end }}
+Secrets:    {{ .Values.secrets.mode }}
+Postgres:   {{ if .Values.postgres.enabled }}in-cluster StatefulSet{{ else }}external ({{ tpl .Values.config.datasource.url . }}){{ end }}
+Kafka:      {{ tpl .Values.config.kafkaBootstrapServers . }}
+
+{{- if .Values.ingress.enabled }}
+
+UI / API entrypoint:  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}/
+{{- else }}
+
+No ingress. Port-forward the UI to try it:
+  kubectl -n <ns> port-forward svc/{{ .Release.Name }}-ui 8088:80
+  open http://localhost:8088
+{{- end }}
+
+Smoke test (admin uploads, user asks):
+  # 1) upload a document (admin/admin)
+  # 2) wait for indexing-service to consume the Kafka event and embed it
+  # 3) POST /api/v1/rag/chat as user/user and confirm sources are cited
+
+{{- if and (eq .Values.config.storageProvider "local") (or .Values.documentService.enabled .Values.indexingService.enabled) }}
+
+WARNING: storageProvider=local uses a per-pod emptyDir; document-service and
+indexing-service DO NOT share files across pods. This is for single-node demo
+only. For any real deployment set config.storageProvider=s3.
+{{- end }}
+
+{{- if and (eq .Values.config.embeddingProvider "openai") (ne .Values.llmProvider "openai") }}
+{{- end }}
+
+Reminder: indexing-service and rag-service MUST use the same embedding provider,
+model and dimensions ({{ .Values.config.embeddingDimensions }}). Switching the
+embedding provider requires re-indexing existing documents.

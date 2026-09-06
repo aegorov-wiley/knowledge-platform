@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Knowledge Platform — Demo</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Knowledge Platform</h1>
+    <div class="auth">
+      <label>Demo user
+        <select id="user">
+          <option value="admin:admin">admin (ROLE_ADMIN)</option>
+          <option value="user:user">user (ROLE_USER)</option>
+        </select>
+      </label>
+      <span id="whoami" class="muted">not signed in</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>1. Upload a document <span class="muted">(admin only)</span></h2>
+      <form id="uploadForm">
+        <input type="file" id="file" required />
+        <button type="submit">Upload</button>
+      </form>
+      <p id="uploadStatus" class="status"></p>
+      <p class="muted">After upload, wait a few seconds for indexing (Kafka → embeddings → pgvector).</p>
+    </section>
+
+    <section class="panel">
+      <h2>2. Ask a question</h2>
+      <form id="chatForm">
+        <input type="text" id="question" placeholder="Ask about the uploaded documents…" required />
+        <button type="submit" id="askBtn">Ask</button>
+      </form>
+      <p class="muted">Conversation: <span id="conversationId">new</span>
+        <button id="resetConv" type="button" class="link">reset</button></p>
+    </section>
+
+    <section class="grid">
+      <div class="panel answer">
+        <h3>Answer</h3>
+        <div id="answer" class="answer-body"></div>
+        <p id="chatError" class="status error"></p>
+      </div>
+      <div class="panel">
+        <h3>Sources</h3>
+        <ol id="sources" class="sources"></ol>
+        <h3>Timings</h3>
+        <pre id="timings" class="timings"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
