@@ -62,7 +62,6 @@ class DocumentIndexingServiceTest {
                 STORAGE_KEY,
                 NOW
         );
-
         byte[] rawBytes = "pdf-content".getBytes();
         String extractedText = "Extracted document text";
         List<String> chunks = List.of("Chunk 1", "Chunk 2");
