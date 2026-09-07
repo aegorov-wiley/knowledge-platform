@@ -9,6 +9,8 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
+import static org.springframework.security.config.Customizer.withDefaults;
+
 /**
  * Demo-grade role-based security for rag-service (WebFlux).
  * <p>
@@ -38,7 +40,7 @@ public class SecurityConfiguration {
                         .permitAll()
                         .pathMatchers("/api/v1/rag/**").hasAnyRole("USER", "ADMIN")
                         .anyExchange().authenticated())
-                .httpBasic(org.springframework.security.config.Customizer.withDefaults())
+                .httpBasic(withDefaults())
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .build();
     }

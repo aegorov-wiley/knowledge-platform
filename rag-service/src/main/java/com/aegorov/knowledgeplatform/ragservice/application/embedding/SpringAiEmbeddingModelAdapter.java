@@ -12,9 +12,9 @@ package com.aegorov.knowledgeplatform.ragservice.application.embedding;
  */
 public class SpringAiEmbeddingModelAdapter implements EmbeddingModel {
 
-    private final org.springframework.ai.embedding.EmbeddingModel delegate;
+    private final EmbeddingModel delegate;
 
-    public SpringAiEmbeddingModelAdapter(org.springframework.ai.embedding.EmbeddingModel delegate) {
+    public SpringAiEmbeddingModelAdapter(EmbeddingModel delegate) {
         this.delegate = delegate;
     }
 

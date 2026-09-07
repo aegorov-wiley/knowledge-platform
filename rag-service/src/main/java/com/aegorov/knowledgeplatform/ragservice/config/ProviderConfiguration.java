@@ -1,5 +1,6 @@
 package com.aegorov.knowledgeplatform.ragservice.config;
 
+import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -37,8 +38,8 @@ public class ProviderConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "knowledge-platform.embedding", name = "provider",
             havingValue = "openai")
-    EmbeddingModel openAiEmbeddingSeam(org.springframework.ai.openai.OpenAiEmbeddingModel delegate) {
-        return new SpringAiEmbeddingModelAdapter(delegate);
+    EmbeddingModel openAiEmbeddingSeam(OpenAiEmbeddingModel delegate) {
+        return new SpringAiEmbeddingModelAdapter((EmbeddingModel) delegate);
     }
 
     @Bean
