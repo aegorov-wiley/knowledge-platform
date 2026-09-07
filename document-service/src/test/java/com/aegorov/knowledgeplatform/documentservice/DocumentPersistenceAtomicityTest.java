@@ -14,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
@@ -52,10 +53,11 @@ class DocumentPersistenceAtomicityTest {
                     "documents/test/architecture.pdf"
             );
         } catch (RuntimeException ex) {
-            org.assertj.core.api.Assertions.assertThat(ex).hasMessageContaining("boom");
+            assertThat(ex).hasMessageContaining("boom");
         }
 
-        org.assertj.core.api.Assertions.assertThat(documentRepository.count()).isZero();
-        org.assertj.core.api.Assertions.assertThat(outboxEventRepository.count()).isZero();
+
+        assertThat(documentRepository.count()).isZero();
+        assertThat(outboxEventRepository.count()).isZero();
     }
 }
