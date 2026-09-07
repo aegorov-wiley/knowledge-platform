@@ -6,6 +6,7 @@ import com.aegorov.knowledgeplatform.documentservice.messaging.OutboxPublisherSe
 import com.aegorov.knowledgeplatform.documentservice.persistence.DocumentRepository;
 import com.aegorov.knowledgeplatform.documentservice.persistence.OutboxEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -28,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -37,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Slf4j
 @SpringBootTest(properties = {
         "spring.task.scheduling.enabled=false",
         "knowledge-platform.storage.local.root=target/test-storage",
@@ -173,7 +176,7 @@ class DocumentServiceIntegrationTest {
         outboxPublisherService.publishDueEvents();
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProperties())) {
-            consumer.subscribe(java.util.List.of(TOPIC));
+            consumer.subscribe(List.of(TOPIC));
             ConsumerRecord<String, String> record = pollForRecord(consumer, TOPIC, documentId.toString());
             Assertions.assertThat(record.key()).isEqualTo(documentId.toString());
             Assertions.assertThat(record.value()).contains("architecture.pdf");
@@ -232,6 +235,7 @@ class DocumentServiceIntegrationTest {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(500));
             for (ConsumerRecord<String, String> record : records.records(topic)) {
                 if (key.equals(record.key())) {
+                    log.info("Received test-record: key:{}, value:{}", record.key(), record.value());
                     return record;
                 }
             }
